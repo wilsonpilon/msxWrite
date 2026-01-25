@@ -10,6 +10,10 @@ import customtkinter as ctk
 
 from app_db import AppDatabase
 from msx_basic_decoder import decode_msx_basic_segments
+from alphabet_viewer import AlphabetViewerFrame
+from layout_viewer import LayoutViewerFrame
+from screen_viewer import ScreenViewerFrame
+from shape_viewer import ShapeViewerFrame
 
 
 APP_TITLE = "msxRead"
@@ -65,6 +69,10 @@ class MSXViewer(ctk.CTk):
         self.current_file: str | None = None
         self.current_file_kind: str | None = None
         self.current_msx_segments: list[tuple[str, str]] | None = None
+        self.shape_viewer: ShapeViewerFrame | None = None
+        self.alphabet_viewer: AlphabetViewerFrame | None = None
+        self.layout_viewer: LayoutViewerFrame | None = None
+        self.screen_viewer: ScreenViewerFrame | None = None
 
         self.syntax_theme_name = self.db.get_setting("syntax_theme", DEFAULT_SYNTAX_THEME)
         self.syntax_colors = self._load_syntax_colors(self.syntax_theme_name)
@@ -133,13 +141,20 @@ class MSXViewer(ctk.CTk):
 
         right = ctk.CTkFrame(self)
         right.grid(row=1, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
-        right.grid_rowconfigure(1, weight=1)
+        right.grid_rowconfigure(0, weight=1)
         right.grid_columnconfigure(0, weight=1)
 
-        self.file_label = ctk.CTkLabel(right, text="Selecione um arquivo")
+        self.right_tabs = ctk.CTkTabview(right)
+        self.right_tabs.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        content_tab = self.right_tabs.add("Conteudo")
+        content_tab.grid_rowconfigure(1, weight=1)
+        content_tab.grid_columnconfigure(0, weight=1)
+
+        self.file_label = ctk.CTkLabel(content_tab, text="Selecione um arquivo")
         self.file_label.grid(row=0, column=0, sticky="w", padx=10, pady=(10, 5))
 
-        self.textbox = ctk.CTkTextbox(right, wrap="none")
+        self.textbox = ctk.CTkTextbox(content_tab, wrap="none")
         self.textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.textbox.configure(font=self.text_font, state="disabled")
         self.text_widget = self.textbox._textbox
@@ -147,8 +162,32 @@ class MSXViewer(ctk.CTk):
         self.default_text_fg = self.textbox.cget("text_color")
         self._configure_syntax_tags()
 
-        self.status_label = ctk.CTkLabel(right, text="", anchor="w")
+        self.status_label = ctk.CTkLabel(content_tab, text="", anchor="w")
         self.status_label.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+
+        shape_tab = self.right_tabs.add("Shape")
+        shape_tab.grid_rowconfigure(0, weight=1)
+        shape_tab.grid_columnconfigure(0, weight=1)
+        self.shape_viewer = ShapeViewerFrame(shape_tab)
+        self.shape_viewer.grid(row=0, column=0, sticky="nsew")
+
+        alphabet_tab = self.right_tabs.add("Alfabeto")
+        alphabet_tab.grid_rowconfigure(0, weight=1)
+        alphabet_tab.grid_columnconfigure(0, weight=1)
+        self.alphabet_viewer = AlphabetViewerFrame(alphabet_tab)
+        self.alphabet_viewer.grid(row=0, column=0, sticky="nsew")
+
+        layout_tab = self.right_tabs.add("Layout")
+        layout_tab.grid_rowconfigure(0, weight=1)
+        layout_tab.grid_columnconfigure(0, weight=1)
+        self.layout_viewer = LayoutViewerFrame(layout_tab)
+        self.layout_viewer.grid(row=0, column=0, sticky="nsew")
+
+        screen_tab = self.right_tabs.add("Screen")
+        screen_tab.grid_rowconfigure(0, weight=1)
+        screen_tab.grid_columnconfigure(0, weight=1)
+        self.screen_viewer = ScreenViewerFrame(screen_tab)
+        self.screen_viewer.grid(row=0, column=0, sticky="nsew")
 
     def _choose_directory(self) -> None:
         path = filedialog.askdirectory(initialdir=self.base_dir, title="Selecione o diretorio")
@@ -217,18 +256,37 @@ class MSXViewer(ctk.CTk):
         segments: list[tuple[str, str]] | None = None
         try:
             data = Path(file_path).read_bytes()
-            if self._looks_like_msx_basic_data(data):
+            if Path(file_path).suffix.lower() == ".shp":
+                self._open_shape_viewer(file_path)
+                decoded = "Arquivo SHP aberto no visualizador."
+                file_kind = "Graphos Shape"
+            elif Path(file_path).suffix.lower() == ".alf":
+                self._open_alphabet_viewer(file_path)
+                decoded = "Arquivo ALF aberto no visualizador."
+                file_kind = "Graphos Alphabet"
+            elif Path(file_path).suffix.lower() == ".lay":
+                self._open_layout_viewer(file_path)
+                decoded = "Arquivo LAY aberto no visualizador."
+                file_kind = "Graphos Layout"
+            elif Path(file_path).suffix.lower() == ".scr":
+                self._open_screen_viewer(file_path)
+                decoded = "Arquivo SCR aberto no visualizador."
+                file_kind = "Graphos Screen 2"
+            elif self._looks_like_msx_basic_data(data):
                 segments = decode_msx_basic_segments(data)
                 decoded = "".join(text for _kind, text in segments)
                 file_kind = "MSX BASIC"
+                self.right_tabs.set("Conteudo")
             else:
                 text = self._decode_text(data)
                 if text is not None:
                     decoded = text
                     file_kind = "Texto"
+                    self.right_tabs.set("Conteudo")
                 else:
                     decoded = self._hex_dump(data)
                     file_kind = "Binario"
+                    self.right_tabs.set("Conteudo")
         except Exception as exc:
             messagebox.showerror("Erro ao abrir", str(exc))
             return
@@ -244,6 +302,26 @@ class MSXViewer(ctk.CTk):
             self._set_msx_text(self.current_msx_segments)
         else:
             self._set_text(decoded)
+
+    def _open_shape_viewer(self, file_path: str) -> None:
+        if self.shape_viewer:
+            self.shape_viewer.set_file(file_path)
+        self.right_tabs.set("Shape")
+
+    def _open_alphabet_viewer(self, file_path: str) -> None:
+        if self.alphabet_viewer:
+            self.alphabet_viewer.set_file(file_path)
+        self.right_tabs.set("Alfabeto")
+
+    def _open_layout_viewer(self, file_path: str) -> None:
+        if self.layout_viewer:
+            self.layout_viewer.set_file(file_path)
+        self.right_tabs.set("Layout")
+
+    def _open_screen_viewer(self, file_path: str) -> None:
+        if self.screen_viewer:
+            self.screen_viewer.set_file(file_path)
+        self.right_tabs.set("Screen")
 
     def _set_text(self, text: str) -> None:
         self.textbox.configure(state="normal")

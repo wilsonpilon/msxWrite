@@ -1,7 +1,7 @@
 # msxRead
 
-Leitor de arquivos MSX BASIC tokenizados (formato binario com 0xFF no inicio)
-para texto ASCII puro, com interface grafica para navegar e visualizar.
+Leitor e visualizador de arquivos MSX BASIC tokenizados (formato binario com 0xFF no inicio)
+e arquivos do Graphos III, com interface grafica para navegar e visualizar.
 
 Este programa nao faz parte do Basic Dignified Suite nem do MSX Converter; e um projeto independente apenas inspirado neles.
 
@@ -31,8 +31,14 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Selecione um diretorio com arquivos MSX BASIC tokenizados (BAS binario).
-O programa lista os arquivos, abre o selecionado e mostra o texto ASCII.
+Selecione um diretorio com arquivos MSX/Graphos.
+O programa lista os arquivos, abre o selecionado e mostra o texto ASCII ou o visualizador adequado.
+
+Formatos suportados (Graphos III):
+- `.SHP` (Shapes)
+- `.ALF` (Alfabeto)
+- `.LAY` (Layout)
+- `.SCR` (Screen 2)
 
 ## Bibliotecas usadas
 - `customtkinter` (UI)
