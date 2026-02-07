@@ -32,6 +32,14 @@ class AppDatabase:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS renum_map (
+                    old_ln INTEGER PRIMARY KEY,
+                    new_ln INTEGER NOT NULL
+                )
+                """
+            )
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:
         with self._connect() as conn:

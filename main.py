@@ -189,6 +189,9 @@ class MSXViewer(ctk.CTk):
         self.screen_viewer = ScreenViewerFrame(screen_tab)
         self.screen_viewer.grid(row=0, column=0, sticky="nsew")
 
+        editor_button = ctk.CTkButton(header, text="Editor BASIC", command=self._open_basic_editor)
+        editor_button.grid(row=0, column=5, padx=(0, 10), pady=10)
+
     def _choose_directory(self) -> None:
         path = filedialog.askdirectory(initialdir=self.base_dir, title="Selecione o diretorio")
         if not path:
@@ -566,6 +569,11 @@ class MSXViewer(ctk.CTk):
                 self._set_msx_text(self.current_msx_segments)
 
         dialog.destroy()
+
+    def _open_basic_editor(self) -> None:
+        from msx_basic_editor import MSXBasicEditor
+        editor = MSXBasicEditor(self)
+        editor.focus()
 
 
 def main() -> None:

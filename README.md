@@ -1,23 +1,35 @@
 # msxRead
 
-Leitor e visualizador de arquivos MSX BASIC tokenizados (formato binario com 0xFF no inicio)
-e arquivos do Graphos III, com interface grafica para navegar e visualizar.
-
-Este programa nao faz parte do Basic Dignified Suite nem do MSX Converter; e um projeto independente apenas inspirado neles.
+Leitor, visualizador e editor de arquivos MSX BASIC e arquivos do Graphos III, com interface gráfica moderna baseada em `customtkinter`.
 
 ![Screenshot do msxRead](read-00.png)
 
-## O que foi usado nesta parte
-- Parser MSX BASIC: decodificacao de tokens 0x80.., 0xFF e numeros (inclui BCD customizado).
-- Detector simples de arquivo MSX BASIC: verifica byte 0xFF no inicio.
-- Persistencia local: guarda ultima pasta/arquivo e tamanho da janela em `msxread.db`.
-- Fontes MSX (opcional): `MSX-Screen0.ttf` e `MSX-Screen1.ttf`.
+## Novidade: Protótipo de Editor MSX-BASIC
+O projeto agora inclui um editor completo inspirado no estilo **QuickBasic**, projetado para facilitar o desenvolvimento de software para MSX.
 
-## Projetos que inspiraram esta parte
-- Basic Dignified Suite: https://github.com/farique1/basic-dignified
-- MSX Converter: https://github.com/fgroen/msxconverter
+![Screenshot do msxRead](read-01.png)
 
-## Instalacao
+### Principais Funcionalidades do Editor:
+- **Destaque de Sintaxe (Syntax Highlighting):** Realce em tempo real de comandos, funções, strings, comentários e números de linha. Cores totalmente personalizáveis.
+- **Auto-Formatação (Beautify):** Organiza o código automaticamente ao digitar, inserindo espaços entre palavras-chave e operadores para melhor legibilidade.
+- **Renumeração Inteligente (RENUM):** Função que utiliza **SQLite** para mapear e atualizar automaticamente todas as referências de salto (`GOTO`, `GOSUB`, `THEN`, `ELSE`, etc.) ao renumerar o programa.
+- **Suporte ao MSX Basic Dignified:** Ferramentas para remover e adicionar números de linha, permitindo um fluxo de trabalho de edição moderna sem a necessidade de gerenciar números de linha manualmente.
+- **Persistência de Configurações:** Preferências do editor (cores, incrementos de renumeração, preservação de caixa alta/baixa) são salvas no banco de dados local.
+- **Compatibilidade:** Abre arquivos tokenizados (.bas) e salva/abre arquivos em formato ASCII (.asc/.txt) compatíveis com o comando `LOAD "FILE",A` do MSX.
+
+## Visualizador de Arquivos
+- **Graphos III:** Suporte para visualização de arquivos `.SHP` (Shapes), `.ALF` (Alfabeto), `.LAY` (Layout) e `.SCR` (Screen 2).
+- **Disk Reader:** Interface para listar e visualizar arquivos diretamente de diretórios que simulam discos de MSX.
+
+![Screenshot do msxRead](read-02.png)
+
+## Tecnologias Utilizadas
+- **Python 3.10+**
+- **CustomTkinter:** Interface gráfica moderna e responsiva.
+- **SQLite3:** Gerenciamento de configurações, histórico de arquivos e mapas de renumeração.
+- **Pillow:** Processamento de imagens para os visualizadores.
+
+## Instalação
 Requer Python 3.10+ (testado com Tkinter no Windows).
 
 ```sh
@@ -26,30 +38,14 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Execucao
+## Execução
 ```sh
 python main.py
 ```
 
-Selecione um diretorio com arquivos MSX/Graphos.
-O programa lista os arquivos, abre o selecionado e mostra o texto ASCII ou o visualizador adequado.
-
-Formatos suportados (Graphos III):
-- `.SHP` (Shapes)
-- `.ALF` (Alfabeto)
-- `.LAY` (Layout)
-- `.SCR` (Screen 2)
-
-## Bibliotecas usadas
-- `customtkinter` (UI)
-- `tkinter` (widgets nativos)
-- `sqlite3` (persistencia local)
-- `pathlib` (paths)
-
-## Ferramentas usadas
-- Python
-- pip/venv
-- Git
+## Projetos que inspiraram esta parte
+- Basic Dignified Suite: https://github.com/farique1/basic-dignified
+- MSX Converter: https://github.com/fgroen/msxconverter
 
 ## Ferramenta de IA usada
-- OpenAI Codex CLI (GPT-5)
+- Junie (JetBrains AI Agent)
