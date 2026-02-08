@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import re
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
@@ -9,16 +10,16 @@ import customtkinter as ctk
 from msx_basic_decoder import decode_msx_basic_segments
 
 
-class MSXBasicEditor(ctk.CTkToplevel):
-    def __init__(self, master: ctk.CTk | None = None) -> None:
-        super().__init__(master)
+class MSXBasicEditor(ctk.CTk):
+    def __init__(self) -> None:
+        super().__init__()
 
-        self.db = None
-        if master and hasattr(master, "db"):
-            self.db = master.db
+        from app_db import AppDatabase
+        self.db = AppDatabase(Path("msxread.db"))
 
         # Default settings
         self.settings = {
+            "dialect": "MSX-BASIC",
             "start_line": "10",
             "increment": "10",
             "color_keyword": "#569CD6",
@@ -27,11 +28,14 @@ class MSXBasicEditor(ctk.CTkToplevel):
             "color_number": "#B5CEA8",
             "color_linenumber": "#858585",
             "color_function": "#DCDCAA",
-            "keep_case": "False"
+            "keep_case": "False",
+            "openmsx_path": "",
+            "fmsx_path": "",
+            "extra_configs": ""
         }
         self._load_settings()
 
-        self.title("Editor MSX BASIC")
+        self.title("MSX-Write - Editor MSX BASIC")
         self.geometry("1000x700")
         
         self.grid_columnconfigure(0, weight=1)
@@ -72,6 +76,7 @@ class MSXBasicEditor(ctk.CTkToplevel):
         self.tools_menu.add_command(label="Remover Números de Linha", command=self._remove_line_numbers)
         self.tools_menu.add_command(label="Adicionar Números de Linha", command=self._add_line_numbers)
         self.tools_menu.add_command(label="Formatar Código (Beautify)", command=self._on_beautify_all)
+        self.tools_menu.add_command(label="Mapa do Programa", command=self._on_program_map)
         self.tools_menu.add_separator()
         self.tools_menu.add_command(label="Configurações", command=self._on_settings)
 
@@ -90,6 +95,9 @@ class MSXBasicEditor(ctk.CTkToplevel):
 
         btn_settings = ctk.CTkButton(toolbar, text="Config", width=80, command=self._on_settings)
         btn_settings.grid(row=0, column=3, padx=2, pady=2)
+
+        btn_viewer = ctk.CTkButton(toolbar, text="msxRead (Viewer)", width=120, command=self._open_viewer)
+        btn_viewer.grid(row=0, column=4, padx=2, pady=2)
 
         # Editor Area
         self.textbox = ctk.CTkTextbox(self, wrap="none", font=("Consolas", 14), undo=True)
@@ -117,7 +125,6 @@ class MSXBasicEditor(ctk.CTkToplevel):
         for tag in ["keyword", "comment", "string", "number", "linenumber", "function"]:
             self.textbox.tag_remove(tag, "1.0", tk.END)
 
-        import re
         from msx_basic_decoder import TOKEN_MAP, TOKEN_MAP_FF
 
         keywords = set(TOKEN_MAP)
@@ -352,6 +359,16 @@ class MSXBasicEditor(ctk.CTkToplevel):
             messagebox.showerror("Erro", f"Nao foi possivel abrir o arquivo:\n{e}")
 
     def _save_file(self) -> None:
+        content = self.textbox.get("1.0", tk.END).strip()
+        
+        # Dialect restrictions
+        if self.settings.get("dialect") == "MSX-BASIC":
+            lines = content.split("\n")
+            for i, line in enumerate(lines):
+                if line.strip() and not re.match(r"^\d+", line.strip()):
+                    messagebox.showerror("Erro de Dialeto", f"No MSX-BASIC clássico, todas as linhas devem ser numeradas.\nErro na linha {i+1}: {line[:30]}...")
+                    return
+
         file_path = filedialog.asksaveasfilename(
             title="Salvar como",
             defaultextension=".bas",
@@ -373,7 +390,6 @@ class MSXBasicEditor(ctk.CTkToplevel):
             self.textbox.delete("1.0", tk.END)
 
     def _beautify_line(self, line: str) -> str:
-        import re
         from msx_basic_decoder import TOKEN_MAP, TOKEN_MAP_FF
 
         if not line.strip():
@@ -580,6 +596,85 @@ class MSXBasicEditor(ctk.CTkToplevel):
         self._apply_syntax_highlighting()
         messagebox.showinfo("Beautify", "Código formatado com sucesso!")
 
+    def _on_program_map(self) -> None:
+        from msx_basic_analyzer import MSXBasicAnalyzer
+        
+        # O usuário sugeriu que o mapa seja feito após a formatação para evitar erros.
+        # Vamos obter o conteúdo formatado sem necessariamente alterar o texto no editor,
+        # ou apenas formatar as linhas internamente para a análise.
+        content = self.textbox.get("1.0", tk.END).strip()
+        if not content:
+            return
+            
+        lines = content.split("\n")
+        beautified_lines = [self._beautify_line(line) for line in lines]
+        beautified_content = "\n".join(beautified_lines)
+        
+        analyzer = MSXBasicAnalyzer(beautified_content)
+        analyzer.analyze()
+        summary = analyzer.get_summary()
+        
+        self._show_program_map_window(summary)
+
+    def _show_program_map_window(self, summary: dict) -> None:
+        window = ctk.CTkToplevel(self)
+        window.title("Mapa do Programa")
+        window.geometry("800x600")
+        window.grab_set()
+        
+        tabview = ctk.CTkTabview(window)
+        tabview.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        tab_vars = tabview.add("Variáveis")
+        tab_flow = tabview.add("Fluxo e Subrotinas")
+        
+        # --- Aba Variáveis ---
+        # Usar um CTkTextbox para mostrar como tabela ou lista formatada
+        vars_text = ctk.CTkTextbox(tab_vars, font=("Consolas", 12))
+        vars_text.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        header = f"{'Nome':<10} | {'Tipo':<6} | {'Usos':<6} | {'Mem(est)':<8} | {'Linhas'}\n"
+        header += "-" * 75 + "\n"
+        vars_text.insert(tk.END, header)
+        
+        for name, info in summary["variables"].items():
+            lines_str = ", ".join(map(str, info["lines"]))
+            row = f"{name:<10} | {info['type']:<6} | {info['count']:<6} | {info['size']:<8} | {lines_str}\n"
+            vars_text.insert(tk.END, row)
+        
+        vars_text.insert(tk.END, "\n" + "-" * 75 + "\n")
+        vars_text.insert(tk.END, f"Memória total estimada para variáveis simples: {summary['total_memory_est']} bytes\n")
+        vars_text.insert(tk.END, "(Nota: Strings usam 3 bytes para descritor + conteúdo; Arrays não contabilizados)\n")
+        
+        vars_text.configure(state="disabled")
+        
+        # --- Aba Fluxo ---
+        flow_text = ctk.CTkTextbox(tab_flow, font=("Consolas", 12))
+        flow_text.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        flow_text.insert(tk.END, "--- Subrotinas Identificadas (GOSUB targets) ---\n")
+        if summary["subroutines"]:
+            for sub in summary["subroutines"]:
+                flow_text.insert(tk.END, f"Linha {sub}\n")
+        else:
+            flow_text.insert(tk.END, "Nenhuma subrotina identificada.\n")
+            
+        flow_text.insert(tk.END, "\n--- Fluxo de Execução (GOTO/GOSUB) ---\n")
+        header_flow = f"{'Origem':<10} | {'Destino':<10} | {'Tipo'}\n"
+        header_flow += "-" * 40 + "\n"
+        flow_text.insert(tk.END, header_flow)
+        
+        for f in summary["flow"]:
+            row = f"{f['from']:<10} | {f['to']:<10} | {f['type']}\n"
+            flow_text.insert(tk.END, row)
+        
+        flow_text.configure(state="disabled")
+
+    def _open_viewer(self) -> None:
+        from main import MSXViewer
+        viewer = MSXViewer(self)
+        viewer.focus()
+
     def _load_settings(self) -> None:
         if not self.db:
             return
@@ -597,8 +692,18 @@ class MSXBasicEditor(ctk.CTkToplevel):
     def _on_settings(self) -> None:
         dialog = ctk.CTkToplevel(self)
         dialog.title("Configurações")
-        dialog.geometry("400x550")
+        dialog.geometry("500x700")
         dialog.grab_set()
+
+        tabview = ctk.CTkTabview(dialog)
+        tabview.pack(fill="both", expand=True, padx=10, pady=10)
+
+        tab_main = tabview.add("Principal")
+        tab_msx_basic = tabview.add("MSX-BASIC")
+        tab_dignified = tabview.add("Dignified")
+        tab_bas2rom = tabview.add("Bas2Rom")
+        tab_emulator = tabview.add("Emulador")
+        tab_extras = tabview.add("Extras")
 
         # Helper to create entry with label
         def create_entry(parent, label_text, default_val):
@@ -606,12 +711,21 @@ class MSXBasicEditor(ctk.CTkToplevel):
             frame.pack(fill="x", padx=20, pady=5)
             ctk.CTkLabel(frame, text=label_text, width=150, anchor="w").pack(side="left")
             entry = ctk.CTkEntry(frame)
-            entry.insert(0, default_val)
+            entry.insert(0, str(default_val) if default_val is not None else "")
             entry.pack(side="right", expand=True, fill="x")
             return entry
 
-        start_line_entry = create_entry(dialog, "Linha Inicial:", self.settings["start_line"])
-        increment_entry = create_entry(dialog, "Incremento:", self.settings["increment"])
+        # --- Aba Principal ---
+        dialect_var = tk.StringVar(value=self.settings.get("dialect", "MSX-BASIC"))
+        dialect_frame = ctk.CTkFrame(tab_main)
+        dialect_frame.pack(fill="x", padx=20, pady=5)
+        ctk.CTkLabel(dialect_frame, text="Dialeto Atual:", width=150, anchor="w").pack(side="left")
+        dialects = ["MSX-BASIC", "MSX Basic Dignified", "MSX-Bas2Rom"]
+        dialect_menu = ctk.CTkOptionMenu(dialect_frame, values=dialects, variable=dialect_var)
+        dialect_menu.pack(side="right", expand=True, fill="x")
+
+        start_line_entry = create_entry(tab_main, "Linha Inicial:", self.settings["start_line"])
+        increment_entry = create_entry(tab_main, "Incremento:", self.settings["increment"])
         
         color_entries = {}
         color_labels = {
@@ -622,21 +736,36 @@ class MSXBasicEditor(ctk.CTkToplevel):
             "color_linenumber": "Cor Nº Linha:",
             "color_function": "Cor Funções:"
         }
-        
         for key, label in color_labels.items():
-            color_entries[key] = create_entry(dialog, label, self.settings[key])
+            color_entries[key] = create_entry(tab_main, label, self.settings[key])
 
         keep_case_var = tk.BooleanVar(value=self.settings.get("keep_case") == "True")
-        keep_case_check = ctk.CTkCheckBox(dialog, text="Manter palavras-chave como escritas", variable=keep_case_var)
+        keep_case_check = ctk.CTkCheckBox(tab_main, text="Manter palavras-chave como escritas", variable=keep_case_var)
         keep_case_check.pack(pady=10, padx=20, anchor="w")
 
+        # --- Abas de Dialeto (Placeholder por enquanto) ---
+        ctk.CTkLabel(tab_msx_basic, text="Configurações específicas do MSX-BASIC clássico").pack(pady=20)
+        ctk.CTkLabel(tab_dignified, text="Configurações específicas do MSX Basic Dignified").pack(pady=20)
+        ctk.CTkLabel(tab_bas2rom, text="Configurações específicas do MSX-Bas2Rom").pack(pady=20)
+
+        # --- Aba Emulador ---
+        openmsx_entry = create_entry(tab_emulator, "Caminho openMSX:", self.settings.get("openmsx_path", ""))
+        fmsx_entry = create_entry(tab_emulator, "Caminho fMSX:", self.settings.get("fmsx_path", ""))
+
+        # --- Aba Extras ---
+        extra_entry = create_entry(tab_extras, "Configurações Extras:", self.settings.get("extra_configs", ""))
+
         def save():
+            self.settings["dialect"] = dialect_var.get()
             self.settings["start_line"] = start_line_entry.get()
             self.settings["increment"] = increment_entry.get()
             for key in color_entries:
                 self.settings[key] = color_entries[key].get()
             
             self.settings["keep_case"] = str(keep_case_var.get())
+            self.settings["openmsx_path"] = openmsx_entry.get()
+            self.settings["fmsx_path"] = fmsx_entry.get()
+            self.settings["extra_configs"] = extra_entry.get()
             
             self._save_settings()
             self._setup_syntax_highlighting()
@@ -644,4 +773,4 @@ class MSXBasicEditor(ctk.CTkToplevel):
             dialog.destroy()
             messagebox.showinfo("Configurações", "Configurações salvas com sucesso!")
 
-        ctk.CTkButton(dialog, text="Salvar", command=save).pack(pady=20)
+        ctk.CTkButton(dialog, text="Salvar", command=save).pack(pady=10)

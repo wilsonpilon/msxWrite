@@ -16,7 +16,7 @@ from screen_viewer import ScreenViewerFrame
 from shape_viewer import ShapeViewerFrame
 
 
-APP_TITLE = "msxRead"
+APP_TITLE = "MSX-Write"
 DB_NAME = "msxread.db"
 TEXT_ENCODINGS = ("utf-8", "cp1252", "latin-1")
 HEX_PREVIEW_BYTES = 4096
@@ -49,11 +49,14 @@ SYNTAX_THEMES = {
 }
 
 
-class MSXViewer(ctk.CTk):
-    def __init__(self) -> None:
-        super().__init__()
+class MSXViewer(ctk.CTkToplevel):
+    def __init__(self, master: ctk.CTk | None = None) -> None:
+        super().__init__(master)
 
-        self.db = AppDatabase(Path(DB_NAME))
+        if master and hasattr(master, "db"):
+            self.db = master.db
+        else:
+            self.db = AppDatabase(Path(DB_NAME))
 
         self.appearance_mode = self.db.get_setting("appearance_mode", "System")
         self.color_theme = self.db.get_setting("color_theme", "blue")
@@ -571,13 +574,12 @@ class MSXViewer(ctk.CTk):
         dialog.destroy()
 
     def _open_basic_editor(self) -> None:
-        from msx_basic_editor import MSXBasicEditor
-        editor = MSXBasicEditor(self)
-        editor.focus()
+        self.focus()
 
 
 def main() -> None:
-    app = MSXViewer()
+    from msx_basic_editor import MSXBasicEditor
+    app = MSXBasicEditor()
     app.mainloop()
 
 

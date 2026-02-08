@@ -1,36 +1,40 @@
-# msxRead
+# MSX-Write
 
-Leitor, visualizador e editor de arquivos MSX BASIC e arquivos do Graphos III, com interface gráfica moderna baseada em `customtkinter`.
+**MSX-Write** (anteriormente msxRead) é uma ferramenta completa para desenvolvimento e visualização de arquivos para a plataforma MSX, com foco especial no MSX-BASIC.
 
-![Screenshot do msxRead](read-00.png)
+![Screenshot do MSX-Write](read-00.png)
 
-## Novidade: Protótipo de Editor MSX-BASIC
-O projeto agora inclui um editor completo inspirado no estilo **QuickBasic**, projetado para facilitar o desenvolvimento de software para MSX.
+## Editor MSX-BASIC Principal
+O coração do projeto é um editor robusto inspirado no estilo **QuickBasic**, que agora serve como a janela principal da aplicação.
 
-![Screenshot do msxRead](read-01.png)
+![Screenshot do Editor MSX-Write](read-01.png)
 
-### Principais Funcionalidades do Editor:
-- **Destaque de Sintaxe (Syntax Highlighting):** Realce em tempo real de comandos, funções, strings, comentários e números de linha. Cores totalmente personalizáveis.
-- **Auto-Formatação (Beautify):** Organiza o código automaticamente ao digitar, inserindo espaços entre palavras-chave e operadores para melhor legibilidade.
-- **Renumeração Inteligente (RENUM):** Função que utiliza **SQLite** para mapear e atualizar automaticamente todas as referências de salto (`GOTO`, `GOSUB`, `THEN`, `ELSE`, etc.) ao renumerar o programa.
-- **Suporte ao MSX Basic Dignified:** Ferramentas para remover e adicionar números de linha, permitindo um fluxo de trabalho de edição moderna sem a necessidade de gerenciar números de linha manualmente.
-- **Persistência de Configurações:** Preferências do editor (cores, incrementos de renumeração, preservação de caixa alta/baixa) são salvas no banco de dados local.
-- **Compatibilidade:** Abre arquivos tokenizados (.bas) e salva/abre arquivos em formato ASCII (.asc/.txt) compatíveis com o comando `LOAD "FILE",A` do MSX.
+### Funcionalidades de Destaque:
+- **Suporte a Múltiplos Dialetos:** Escolha entre **MSX-BASIC clássico**, **MSX Basic Dignified** ou **MSX-Bas2Rom**. O editor ajusta regras como a obrigatoriedade de números de linha conforme o dialeto selecionado.
+- **Mapa do Programa:** Ferramenta avançada para analisar variáveis (nome, tipo, frequência de uso, estimativa de memória) e fluxo de execução (`GOTO`/`GOSUB`), identificando sub-rotinas automaticamente.
+- **Destaque de Sintaxe (Syntax Highlighting):** Realce em tempo real de comandos, funções, strings, comentários e números de linha, totalmente personalizável.
+- **Auto-Formatação (Beautify):** Organiza o código automaticamente ao digitar, garantindo espaçamento ideal e legibilidade.
+- **Renumeração Inteligente (RENUM):** Atualiza automaticamente todas as referências de salto (`GOTO`, `GOSUB`, `THEN`, `ELSE`, etc.) usando um motor baseado em SQLite.
+- **Configuração por Abas:** Interface de configurações organizada em abas (Principal, Dialetos, Emulador, Extras), permitindo configurar caminhos de emuladores como **openMSX** e **fMSX**.
+- **Compatibilidade:** Suporte a arquivos tokenizados (.bas) e formato ASCII (.asc/.txt) via `LOAD "FILE",A`.
 
-## Visualizador de Arquivos
-- **Graphos III:** Suporte para visualização de arquivos `.SHP` (Shapes), `.ALF` (Alfabeto), `.LAY` (Layout) e `.SCR` (Screen 2).
-- **Disk Reader:** Interface para listar e visualizar arquivos diretamente de diretórios que simulam discos de MSX.
+## msxRead (Visualizador de Arquivos)
+O visualizador original continua integrado como uma ferramenta de suporte, acessível diretamente do editor.
 
-![Screenshot do msxRead](read-02.png)
+![Screenshot do Visualizador msxRead](read-02.png)
+
+- **Arquivos Graphos III:** Visualização de arquivos `.SHP` (Shapes), `.ALF` (Alfabeto), `.LAY` (Layout) e `.SCR` (Screen 2).
+- **Leitor de Disco:** Interface para navegar em arquivos de diretórios que simulam discos MSX.
+- **Hex Dump:** Visualização binária para arquivos desconhecidos.
 
 ## Tecnologias Utilizadas
 - **Python 3.10+**
-- **CustomTkinter:** Interface gráfica moderna e responsiva.
-- **SQLite3:** Gerenciamento de configurações, histórico de arquivos e mapas de renumeração.
-- **Pillow:** Processamento de imagens para os visualizadores.
+- **CustomTkinter:** Interface moderna e responsiva.
+- **SQLite3:** Gerenciamento de configurações e análise de código.
+- **Pillow:** Processamento de imagens.
 
 ## Instalação
-Requer Python 3.10+ (testado com Tkinter no Windows).
+Requer Python 3.10+ (testado no Windows).
 
 ```sh
 python -m venv .venv
@@ -43,9 +47,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Projetos que inspiraram esta parte
-- Basic Dignified Suite: https://github.com/farique1/basic-dignified
-- MSX Converter: https://github.com/fgroen/msxconverter
+## Créditos e Inspirações
+- **Basic Dignified Suite:** [farique1/basic-dignified](https://github.com/farique1/basic-dignified)
+- **MSX Converter:** [fgroen/msxconverter](https://github.com/fgroen/msxconverter)
 
 ## Ferramenta de IA usada
-- Junie (JetBrains AI Agent)
+- **Junie (JetBrains AI Agent)**
