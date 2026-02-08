@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/msxRead.iml" filepath="$PROJECT_DIR$/.idea/msxRead.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/msxWrite.iml" filepath="$PROJECT_DIR$/.idea/msxWrite.iml" />
     </modules>
   </component>
 </project>

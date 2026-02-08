@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import tkinter.font as tkfont
 import re
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -8,6 +9,140 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from msx_basic_decoder import decode_msx_basic_segments
+from chm_viewer import CHMViewer
+
+
+class LineNumbers(tk.Canvas):
+    def __init__(self, master, font, editor, **kwargs):
+        super().__init__(master, width=50, highlightthickness=0, bg="#2b2b2b", **kwargs)
+        self.font = font
+        self.editor = editor
+        self.textbox = None
+
+    def set_textbox(self, textbox):
+        self.textbox = textbox
+
+    def redraw(self):
+        self.delete("all")
+        if not self.textbox:
+            return
+
+        # Update background color from settings
+        bg_color = self.editor.settings.get("color_bg", "#2b2b2b")
+        self.configure(bg=bg_color)
+
+        i = self.textbox.index("@0,0")
+        while True:
+            dline = self.textbox._textbox.dlineinfo(i)
+            if dline is None:
+                break
+            y = dline[1]
+            linenum = str(i).split(".")[0]
+            
+            # Highlight current line
+            cursor_pos = self.textbox.index(tk.INSERT)
+            current_linenum = cursor_pos.split(".")[0]
+            
+            fg = self.editor.settings.get("color_linenumber", "#858585")
+            if linenum == current_linenum:
+                fg = self.editor.settings.get("color_fg", "#ffffff")
+                
+            self.create_text(45, y, anchor="ne", text=linenum, font=self.font, fill=fg)
+            i = self.textbox.index(f"{i} + 1line")
+
+
+class Ruler(tk.Canvas):
+    def __init__(self, master, font, editor, **kwargs):
+        super().__init__(master, height=25, highlightthickness=0, bg="#2b2b2b", **kwargs)
+        self.font = font
+        self.editor = editor
+        self.textbox = None
+
+    def set_textbox(self, textbox):
+        self.textbox = textbox
+
+    def redraw(self):
+        self.delete("all")
+        if not self.textbox:
+            return
+
+        # Update background color from settings
+        bg_color = self.editor.settings.get("color_bg", "#2b2b2b")
+        self.configure(bg=bg_color)
+
+        # Get character width from internal textbox font
+        font_val = self.textbox._textbox.cget("font")
+        f = tkfont.Font(font=font_val)
+        char_width = f.measure("0")
+        
+        # Current cursor column for highlighting
+        cursor_pos = self.textbox.index(tk.INSERT)
+        _, current_col = map(int, cursor_pos.split("."))
+        
+        # Numbers to highlight: 0, 32, 40, 80
+        highlights = {0, 32, 40, 80}
+        
+        # Horizontal scroll position
+        x_offset = self.textbox._textbox.xview()[0]
+        # We need the total width of the text area to convert x_offset to pixels
+        # But bbox is easier if we have text.
+        
+        # Use bbox to find the x position of column 0
+        bbox = self.textbox._textbox.bbox("1.0")
+        if bbox:
+            start_x = bbox[0]
+        else:
+            # Fallback if text is empty or bbox fails
+            # If bbox is None, it might be because the text is scrolled out of view
+            # or the textbox is empty.
+            # If it's scrolled out of view, we can't easily use bbox.
+            # But we can try bbox for a visible line.
+            
+            # Get the first visible index
+            first_visible = self.textbox.index("@0,0")
+            line_start = first_visible.split(".")[0] + ".0"
+            bbox = self.textbox._textbox.bbox(line_start)
+            if bbox:
+                start_x = bbox[0]
+            else:
+                # Absolute fallback - usually CTkTextbox has 2px padding
+                # But it's better to be dynamic. 
+                # If we are at scroll 0, it's likely 2.
+                if x_offset == 0:
+                    start_x = 2
+                else:
+                    # If we are scrolled, we have to estimate or use a different method.
+                    # Since we want it to align with the text, if we can't find the text,
+                    # we might as well not draw or draw at a best guess.
+                    start_x = 2 - (x_offset * self.textbox._textbox.winfo_width()) # This is often not accurate
+        
+        # Adjust start_x for the fact that Ruler is grid-aligned with Textbox
+        # Both are in column 1 of editor_frame.
+        
+        # Draw marks and numbers
+        for col in range(120): # Draw up to 120 columns
+            x = start_x + (col * char_width)
+            
+            if col in highlights:
+                fg = self.editor.settings.get("color_keyword", "#569CD6") # Highlight color
+                weight = "bold"
+                # Small line mark
+                self.create_line(x, 15, x, 25, fill=fg, width=2)
+                # Number
+                # For fixed-width fonts, we want the number to be centered or aligned exactly.
+                # anchor="n" centers the text horizontally at x.
+                self.create_text(x, 5, text=str(col), font=(self.font[0], 10, weight), fill=fg, anchor="n")
+            elif col % 10 == 0:
+                self.create_line(x, 20, x, 25, fill="#555555")
+                if col not in highlights:
+                    self.create_text(x, 8, text=str(col), font=(self.font[0], 8), fill="#858585", anchor="n")
+            elif col % 5 == 0:
+                self.create_line(x, 22, x, 25, fill="#555555")
+
+            # Cursor highlight on ruler
+            if col == current_col:
+                cursor_fg = self.editor.settings.get("color_string", "#CE9178")
+                self.create_line(x, 0, x, 25, fill=cursor_fg, width=1, dash=(2, 2))
 
 
 class MSXBasicEditor(ctk.CTk):
@@ -28,6 +163,8 @@ class MSXBasicEditor(ctk.CTk):
             "color_number": "#B5CEA8",
             "color_linenumber": "#858585",
             "color_function": "#DCDCAA",
+            "color_bg": "#2b2b2b",
+            "color_fg": "#ffffff",
             "keep_case": "False",
             "openmsx_path": "",
             "fmsx_path": "",
@@ -80,6 +217,13 @@ class MSXBasicEditor(ctk.CTk):
         self.tools_menu.add_separator()
         self.tools_menu.add_command(label="Configurações", command=self._on_settings)
 
+        # Help Menu
+        self.help_menu = tk.Menu(self.menubar)
+        self.menubar.add_cascade(label="Ajuda", menu=self.help_menu)
+        self.help_menu.add_command(label="Manuais CHM", command=self._open_chm_viewer)
+        self.help_menu.add_separator()
+        self.help_menu.add_command(label="Sobre", command=lambda: messagebox.showinfo("Sobre", "MSX-Write Editor\nLeitor de CHM integrado"))
+
         # Toolbar
         toolbar = ctk.CTkFrame(self)
         toolbar.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
@@ -99,12 +243,60 @@ class MSXBasicEditor(ctk.CTk):
         btn_viewer = ctk.CTkButton(toolbar, text="msxRead (Viewer)", width=120, command=self._open_viewer)
         btn_viewer.grid(row=0, column=4, padx=2, pady=2)
 
+        btn_chm = ctk.CTkButton(toolbar, text="Manuais CHM", width=120, command=self._open_chm_viewer)
+        btn_chm.grid(row=0, column=5, padx=2, pady=2)
+
         # Editor Area
-        self.textbox = ctk.CTkTextbox(self, wrap="none", font=("Consolas", 14), undo=True)
-        self.textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        editor_frame = ctk.CTkFrame(self)
+        editor_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 5))
+        editor_frame.grid_columnconfigure(1, weight=1)
+        editor_frame.grid_rowconfigure(1, weight=1)
+
+        # Ruler (at the top of the textbox)
+        self.ruler = Ruler(editor_frame, font=("Consolas", 14), editor=self)
+        self.ruler.grid(row=0, column=1, sticky="ew")
+
+        # Line Numbers (at the left of the textbox)
+        self.line_numbers = LineNumbers(editor_frame, font=("Consolas", 14), editor=self)
+        self.line_numbers.grid(row=1, column=0, sticky="ns")
+
+        self.textbox = ctk.CTkTextbox(editor_frame, wrap="none", font=("Consolas", 14), undo=True)
+        self.textbox.grid(row=1, column=1, sticky="nsew")
+        
+        # Link Line Numbers and Ruler to Textbox
+        self.line_numbers.set_textbox(self.textbox)
+        self.ruler.set_textbox(self.textbox)
+
+        # Status Bar
+        self.status_bar = ctk.CTkLabel(self, text="Linha: 1, Coluna: 0", anchor="w")
+        self.status_bar.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 5))
+
         self.textbox.bind("<<Modified>>", self._on_text_modified)
         self.textbox.bind("<KeyRelease-space>", self._on_key_beautify)
         self.textbox.bind("<KeyRelease-Return>", self._on_key_beautify)
+        
+        # Cursor position update
+        self.textbox.bind("<KeyRelease>", self._update_status_bar)
+        self.textbox.bind("<ButtonRelease-1>", self._update_status_bar)
+        
+        # Sync scrolling for line numbers and ruler
+        self.textbox._textbox.configure(yscrollcommand=self._on_textbox_scroll_y, xscrollcommand=self._on_textbox_scroll_x)
+
+    def _on_textbox_scroll_y(self, *args) -> None:
+        # Standard yscrollcommand handling
+        self.textbox._y_scrollbar.set(*args)
+        self.line_numbers.redraw()
+
+    def _on_textbox_scroll_x(self, *args) -> None:
+        self.textbox._x_scrollbar.set(*args)
+        self.ruler.redraw()
+
+    def _update_status_bar(self, event=None) -> None:
+        cursor_pos = self.textbox.index(tk.INSERT)
+        line, col = cursor_pos.split(".")
+        self.status_bar.configure(text=f"Linha: {line}, Coluna: {col}")
+        self.line_numbers.redraw()
+        self.ruler.redraw()
 
     def _setup_syntax_highlighting(self) -> None:
         self.textbox.tag_config("keyword", foreground=self.settings["color_keyword"])
@@ -120,6 +312,8 @@ class MSXBasicEditor(ctk.CTk):
             self.textbox.edit_modified(False)
 
     def _apply_syntax_highlighting(self) -> None:
+        if hasattr(self, "line_numbers"):
+            self.line_numbers.redraw()
         content = self.textbox.get("1.0", tk.END)
         # Clear existing tags
         for tag in ["keyword", "comment", "string", "number", "linenumber", "function"]:
@@ -550,6 +744,13 @@ class MSXBasicEditor(ctk.CTk):
         col_idx = int(cursor_pos.split(".")[1])
         
         line_content = self.textbox.get(f"{line_num}.0", f"{line_num}.end")
+
+        # Verificar se o cursor está dentro de uma string
+        # Contamos as aspas antes do cursor na linha atual
+        quotes_before = line_content[:col_idx].count('"')
+        if quotes_before % 2 != 0:
+            # Se ímpar, o cursor está dentro de uma string (aberta)
+            return
         
         # Se for Enter, formatar a linha ANTERIOR
         if event.keysym == "Return":
@@ -674,6 +875,9 @@ class MSXBasicEditor(ctk.CTk):
         from main import MSXViewer
         viewer = MSXViewer(self)
         viewer.focus()
+
+    def _open_chm_viewer(self) -> None:
+        CHMViewer(self)
 
     def _load_settings(self) -> None:
         if not self.db:

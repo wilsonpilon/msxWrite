@@ -14,6 +14,7 @@ from alphabet_viewer import AlphabetViewerFrame
 from layout_viewer import LayoutViewerFrame
 from screen_viewer import ScreenViewerFrame
 from shape_viewer import ShapeViewerFrame
+from chm_viewer import CHMViewer
 
 
 APP_TITLE = "MSX-Write"
@@ -160,7 +161,7 @@ class MSXViewer(ctk.CTkToplevel):
         self.textbox = ctk.CTkTextbox(content_tab, wrap="none")
         self.textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.textbox.configure(font=self.text_font, state="disabled")
-        self.text_widget = self.textbox._textbox
+        self.text_widget = self.textbox._textbox if hasattr(self.textbox, "_textbox") else self.textbox
         self.default_text_bg = self.textbox.cget("fg_color")
         self.default_text_fg = self.textbox.cget("text_color")
         self._configure_syntax_tags()
@@ -194,6 +195,12 @@ class MSXViewer(ctk.CTkToplevel):
 
         editor_button = ctk.CTkButton(header, text="Editor BASIC", command=self._open_basic_editor)
         editor_button.grid(row=0, column=5, padx=(0, 10), pady=10)
+
+        chm_button = ctk.CTkButton(header, text="Manuais CHM", command=self._open_chm_viewer)
+        chm_button.grid(row=0, column=6, padx=(0, 10), pady=10)
+
+    def _open_chm_viewer(self) -> None:
+        CHMViewer(self)
 
     def _choose_directory(self) -> None:
         path = filedialog.askdirectory(initialdir=self.base_dir, title="Selecione o diretorio")
