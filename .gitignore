@@ -1,5 +1,6 @@
 msxbas2rom/
 basic-dignified/
+msx-encoding/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

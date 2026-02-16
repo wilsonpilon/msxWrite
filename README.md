@@ -10,7 +10,7 @@ O coração do projeto é um editor robusto inspirado no estilo **QuickBasic**, 
 ![Screenshot do Editor MSX-Write](read-01.png)
 
 ### Funcionalidades de Destaque:
-- **Suporte a Múltiplos Dialetos:** Escolha entre **MSX-BASIC clássico**, **MSX Basic Dignified** ou **MSX-Bas2Rom**. O editor ajusta regras como a obrigatoriedade de números de linha conforme o dialeto selecionado.
+- **Suporte a Múltiplos Dialetos:** Escolha entre **MSX-BASIC clássico**, **MSX Basic Dignified** ou **MSXBas2Rom**. O editor ajusta regras como a obrigatoriedade de números de linha conforme o dialeto selecionado.
 - **Mapa do Programa:** Ferramenta avançada para analisar variáveis (nome, tipo, frequência de uso, estimativa de memória) e fluxo de execução (`GOTO`/`GOSUB`), identificando sub-rotinas automaticamente.
 - **Destaque de Sintaxe (Syntax Highlighting):** Realce em tempo real de comandos, funções, strings, comentários e números de linha, totalmente personalizável.
 - **Auto-Formatação (Beautify):** Organiza o código automaticamente ao digitar, garantindo espaçamento ideal e legibilidade.
@@ -48,6 +48,8 @@ python main.py
 ```
 
 ## Créditos e Inspirações
+- **MSXBas2Rom:** [amaurycarvalho/msxbas2rom](https://github.com/amaurycarvalho/msxbas2rom)
+- **Extensão MSX Text Encoding:** [nataliapc.msx-text-encoding](https://marketplace.visualstudio.com/items?itemName=nataliapc.msx-text-encoding)
 - **Basic Dignified Suite:** [farique1/basic-dignified](https://github.com/farique1/basic-dignified)
 - **MSX Converter:** [fgroen/msxconverter](https://github.com/fgroen/msxconverter)
 

@@ -10,6 +10,7 @@ import customtkinter as ctk
 
 from msx_basic_decoder import decode_msx_basic_segments
 from help_viewer import HelpViewer
+from syntax_themes import SYNTAX_THEMES, DEFAULT_SYNTAX_THEME, get_syntax_colors, save_syntax_colors
 
 # Paleta de cores do MSX1 (0-15)
 # Fonte: https://paulwratt.github.io/programmers-palettes/HW-MSX/HW-MSX-palettes.html
@@ -65,7 +66,7 @@ class LineNumbers(tk.Canvas):
             cursor_pos = self.textbox.index(tk.INSERT)
             current_linenum = cursor_pos.split(".")[0]
             
-            fg = self.editor.settings.get("color_linenumber", "#858585")
+            fg = self.editor.settings.get("color_line_number", "#858585")
             if linenum == current_linenum:
                 fg = self.editor.settings.get("color_fg", "#ffffff")
                 
@@ -146,7 +147,7 @@ class Ruler(tk.Canvas):
             x = start_x + (col * char_width)
             
             if col in highlights:
-                fg = self.editor.settings.get("color_keyword", "#569CD6") # Highlight color
+                fg = self.editor.settings.get("color_command", "#569CD6") # Highlight color
                 weight = "bold"
                 # Small line mark
                 self.create_line(x, 15, x, 25, fill=fg, width=2)
@@ -179,20 +180,17 @@ class MSXBasicEditor(ctk.CTk):
             "dialect": "MSX-BASIC",
             "start_line": "10",
             "increment": "10",
-            "color_keyword": "#569CD6",
-            "color_comment": "#6A9955",
-            "color_string": "#CE9178",
-            "color_number": "#B5CEA8",
-            "color_linenumber": "#858585",
-            "color_function": "#DCDCAA",
-            "color_bg": "#2b2b2b",
-            "color_fg": "#ffffff",
             "keep_case": "False",
             "openmsx_path": "",
             "fmsx_path": "",
             "extra_configs": ""
         }
         self._load_settings()
+        
+        # Load syntax colors from unified theme
+        self.syntax_colors = get_syntax_colors(self.db)
+        for key, value in self.syntax_colors.items():
+            self.settings[f"color_{key}"] = value
 
         self.title("MSX-Write - Editor MSX BASIC")
         self.geometry("1000x700")
@@ -294,6 +292,9 @@ class MSXBasicEditor(ctk.CTk):
         # Line Numbers (at the left of the textbox)
         self.line_numbers = LineNumbers(editor_frame, font=("Consolas", 14), editor=self)
         self.line_numbers.grid(row=1, column=0, sticky="ns")
+        
+        self.line_numbers.configure(bg=self.settings.get("color_bg", "#2b2b2b"))
+        self.ruler.configure(bg=self.settings.get("color_bg", "#2b2b2b"))
 
         self.textbox = ctk.CTkTextbox(editor_frame, wrap="none", font=("Consolas", 14), undo=True)
         self.textbox.grid(row=1, column=1, sticky="nsew")
@@ -537,12 +538,17 @@ class MSXBasicEditor(ctk.CTk):
         self.ruler.redraw()
 
     def _setup_syntax_highlighting(self) -> None:
-        self.textbox.tag_config("keyword", foreground=self.settings["color_keyword"])
-        self.textbox.tag_config("comment", foreground=self.settings["color_comment"])
-        self.textbox.tag_config("string", foreground=self.settings["color_string"])
-        self.textbox.tag_config("number", foreground=self.settings["color_number"])
-        self.textbox.tag_config("linenumber", foreground=self.settings["color_linenumber"])
-        self.textbox.tag_config("function", foreground=self.settings["color_function"])
+        self.textbox.tag_config("keyword", foreground=self.settings.get("color_command", "#569CD6"))
+        self.textbox.tag_config("comment", foreground=self.settings.get("color_comment", "#6A9955"))
+        self.textbox.tag_config("string", foreground=self.settings.get("color_string", "#CE9178"))
+        self.textbox.tag_config("number", foreground=self.settings.get("color_number", "#B5CEA8"))
+        self.textbox.tag_config("linenumber", foreground=self.settings.get("color_line_number", "#858585"))
+        self.textbox.tag_config("function", foreground=self.settings.get("color_function", "#DCDCAA"))
+        
+        # Apply BG/FG to textbox
+        bg = self.settings.get("color_bg", "#2b2b2b")
+        fg = self.settings.get("color_fg", "#ffffff")
+        self.textbox.configure(fg_color=bg, text_color=fg)
 
     def _on_text_modified(self, event=None) -> None:
         if self.textbox.edit_modified():
@@ -1201,6 +1207,21 @@ class MSXBasicEditor(ctk.CTk):
             return entry
 
         # --- Aba Principal ---
+        syntax_theme_var = tk.StringVar(value=self.db.get_setting("syntax_theme", DEFAULT_SYNTAX_THEME))
+        theme_frame = ctk.CTkFrame(tab_main)
+        theme_frame.pack(fill="x", padx=20, pady=5)
+        ctk.CTkLabel(theme_frame, text="Tema de Sintaxe:", width=150, anchor="w").pack(side="left")
+        
+        def on_theme_change(new_theme):
+            theme_colors = SYNTAX_THEMES.get(new_theme, SYNTAX_THEMES[DEFAULT_SYNTAX_THEME])
+            for k, v in theme_colors.items():
+                if k in color_entries:
+                    color_entries[k].delete(0, tk.END)
+                    color_entries[k].insert(0, v)
+
+        theme_menu = ctk.CTkOptionMenu(theme_frame, values=list(SYNTAX_THEMES.keys()), variable=syntax_theme_var, command=on_theme_change)
+        theme_menu.pack(side="right", expand=True, fill="x")
+
         dialect_var = tk.StringVar(value=self.settings.get("dialect", "MSX-BASIC"))
         dialect_frame = ctk.CTkFrame(tab_main)
         dialect_frame.pack(fill="x", padx=20, pady=5)
@@ -1214,15 +1235,17 @@ class MSXBasicEditor(ctk.CTk):
         
         color_entries = {}
         color_labels = {
-            "color_keyword": "Cor Keywords:",
-            "color_comment": "Cor Comentários:",
-            "color_string": "Cor Strings:",
-            "color_number": "Cor Números:",
-            "color_linenumber": "Cor Nº Linha:",
-            "color_function": "Cor Funções:"
+            "command": "Cor Comandos:",
+            "function": "Cor Funções:",
+            "string": "Cor Strings:",
+            "number": "Cor Números:",
+            "line_number": "Cor Nº Linha:",
+            "comment": "Cor Comentários:",
+            "bg": "Cor Fundo:",
+            "fg": "Cor Texto:"
         }
         for key, label in color_labels.items():
-            color_entries[key] = create_entry(tab_main, label, self.settings[key])
+            color_entries[key] = create_entry(tab_main, label, self.settings.get(f"color_{key}"))
 
         keep_case_var = tk.BooleanVar(value=self.settings.get("keep_case") == "True")
         keep_case_check = ctk.CTkCheckBox(tab_main, text="Manter palavras-chave como escritas", variable=keep_case_var)
@@ -1244,8 +1267,14 @@ class MSXBasicEditor(ctk.CTk):
             self.settings["dialect"] = dialect_var.get()
             self.settings["start_line"] = start_line_entry.get()
             self.settings["increment"] = increment_entry.get()
+            
+            new_colors = {}
             for key in color_entries:
-                self.settings[key] = color_entries[key].get()
+                val = color_entries[key].get()
+                self.settings[f"color_{key}"] = val
+                new_colors[key] = val
+            
+            save_syntax_colors(self.db, syntax_theme_var.get(), new_colors)
             
             self.settings["keep_case"] = str(keep_case_var.get())
             self.settings["openmsx_path"] = openmsx_entry.get()
@@ -1253,6 +1282,11 @@ class MSXBasicEditor(ctk.CTk):
             self.settings["extra_configs"] = extra_entry.get()
             
             self._save_settings()
+            
+            # Update UI colors
+            self.line_numbers.configure(bg=self.settings.get("color_bg", "#2b2b2b"))
+            self.ruler.configure(bg=self.settings.get("color_bg", "#2b2b2b"))
+            
             self._setup_syntax_highlighting()
             self._apply_syntax_highlighting()
             dialog.destroy()

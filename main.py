@@ -14,6 +14,7 @@ from alphabet_viewer import AlphabetViewerFrame
 from layout_viewer import LayoutViewerFrame
 from screen_viewer import ScreenViewerFrame
 from shape_viewer import ShapeViewerFrame
+from syntax_themes import SYNTAX_THEMES, DEFAULT_SYNTAX_THEME, get_syntax_colors, save_syntax_colors
 
 try:
     from help_viewer import HelpViewer
@@ -26,33 +27,6 @@ APP_TITLE = "MSX-Write"
 DB_NAME = "msxread.db"
 TEXT_ENCODINGS = ("utf-8", "cp1252", "latin-1")
 HEX_PREVIEW_BYTES = 4096
-DEFAULT_SYNTAX_THEME = "Classico"
-SYNTAX_THEMES = {
-    "Classico": {
-        "command": "#2E6F9E",
-        "function": "#2B7A5B",
-        "string": "#B54D2B",
-        "number": "#7A3E9D",
-        "comment": "#3F6A3F",
-        "line_number": "#6B6B6B",
-    },
-    "Neon": {
-        "command": "#00B3FF",
-        "function": "#00D18B",
-        "string": "#FF8A00",
-        "number": "#A15CFF",
-        "comment": "#00A388",
-        "line_number": "#8A8A8A",
-    },
-    "Papel": {
-        "command": "#2C4E75",
-        "function": "#2F6A52",
-        "string": "#8B3A2A",
-        "number": "#5E3D77",
-        "comment": "#546E3B",
-        "line_number": "#7C6F64",
-    },
-}
 
 
 class MSXViewer(ctk.CTkToplevel):
@@ -84,9 +58,9 @@ class MSXViewer(ctk.CTkToplevel):
         self.screen_viewer: ScreenViewerFrame | None = None
 
         self.syntax_theme_name = self.db.get_setting("syntax_theme", DEFAULT_SYNTAX_THEME)
-        self.syntax_colors = self._load_syntax_colors(self.syntax_theme_name)
-        self.viewer_text_bg = self.db.get_setting("viewer_text_bg", "")
-        self.viewer_text_fg = self.db.get_setting("viewer_text_fg", "")
+        self.syntax_colors = get_syntax_colors(self.db)
+        self.viewer_text_bg = self.syntax_colors.get("bg", "")
+        self.viewer_text_fg = self.syntax_colors.get("fg", "")
 
         self._load_fonts()
         self._build_layout()
@@ -397,23 +371,12 @@ class MSXViewer(ctk.CTkToplevel):
 
     def _configure_syntax_tags(self) -> None:
         colors = self.syntax_colors
-        self.text_widget.tag_config("msx_command", foreground=colors["command"])
-        self.text_widget.tag_config("msx_function", foreground=colors["function"])
-        self.text_widget.tag_config("msx_string", foreground=colors["string"])
-        self.text_widget.tag_config("msx_number", foreground=colors["number"])
-        self.text_widget.tag_config("msx_comment", foreground=colors["comment"])
-        self.text_widget.tag_config("msx_line_number", foreground=colors["line_number"])
-
-    def _load_syntax_colors(self, theme_name: str) -> dict[str, str]:
-        theme = SYNTAX_THEMES.get(theme_name, SYNTAX_THEMES[DEFAULT_SYNTAX_THEME]).copy()
-        legacy_keyword = self.db.get_setting("syntax_color_keyword", "")
-        if legacy_keyword and not self.db.get_setting("syntax_color_command", ""):
-            theme["command"] = legacy_keyword
-        for key in ("command", "function", "string", "number", "comment", "line_number"):
-            saved = self.db.get_setting(f"syntax_color_{key}", "")
-            if saved:
-                theme[key] = saved
-        return theme
+        self.text_widget.tag_config("msx_command", foreground=colors.get("command", "#2E6F9E"))
+        self.text_widget.tag_config("msx_function", foreground=colors.get("function", "#2B7A5B"))
+        self.text_widget.tag_config("msx_string", foreground=colors.get("string", "#B54D2B"))
+        self.text_widget.tag_config("msx_number", foreground=colors.get("number", "#7A3E9D"))
+        self.text_widget.tag_config("msx_comment", foreground=colors.get("comment", "#3F6A3F"))
+        self.text_widget.tag_config("msx_line_number", foreground=colors.get("line_number", "#6B6B6B"))
 
     def _apply_viewer_colors(self) -> None:
         bg = self.viewer_text_bg or self.default_text_bg
@@ -436,12 +399,14 @@ class MSXViewer(ctk.CTkToplevel):
 
         syntax_theme_var = tk.StringVar(value=self.syntax_theme_name)
         syntax_vars = {
-            "command": tk.StringVar(value=self.syntax_colors["command"]),
-            "function": tk.StringVar(value=self.syntax_colors["function"]),
-            "string": tk.StringVar(value=self.syntax_colors["string"]),
-            "number": tk.StringVar(value=self.syntax_colors["number"]),
-            "comment": tk.StringVar(value=self.syntax_colors["comment"]),
-            "line_number": tk.StringVar(value=self.syntax_colors["line_number"]),
+            "command": tk.StringVar(value=self.syntax_colors.get("command", "")),
+            "function": tk.StringVar(value=self.syntax_colors.get("function", "")),
+            "string": tk.StringVar(value=self.syntax_colors.get("string", "")),
+            "number": tk.StringVar(value=self.syntax_colors.get("number", "")),
+            "comment": tk.StringVar(value=self.syntax_colors.get("comment", "")),
+            "line_number": tk.StringVar(value=self.syntax_colors.get("line_number", "")),
+            "bg": tk.StringVar(value=self.syntax_colors.get("bg", "")),
+            "fg": tk.StringVar(value=self.syntax_colors.get("fg", "")),
         }
 
         row = 0
@@ -461,18 +426,18 @@ class MSXViewer(ctk.CTkToplevel):
         ctk.CTkButton(
             container,
             text="Escolher",
-            command=lambda: self._pick_color(dialog, viewer_bg_var),
+            command=lambda: self._pick_color(dialog, syntax_vars["bg"]),
         ).grid(row=row, column=1, sticky="w", pady=(0, 4))
-        ctk.CTkLabel(container, textvariable=viewer_bg_var, width=90).grid(row=row, column=2, sticky="w", pady=(0, 4))
+        ctk.CTkLabel(container, textvariable=syntax_vars["bg"], width=90).grid(row=row, column=2, sticky="w", pady=(0, 4))
         row += 1
 
         ctk.CTkLabel(container, text="Cor do texto").grid(row=row, column=0, sticky="w", pady=(0, 12))
         ctk.CTkButton(
             container,
             text="Escolher",
-            command=lambda: self._pick_color(dialog, viewer_fg_var),
+            command=lambda: self._pick_color(dialog, syntax_vars["fg"]),
         ).grid(row=row, column=1, sticky="w", pady=(0, 12))
-        ctk.CTkLabel(container, textvariable=viewer_fg_var, width=90).grid(row=row, column=2, sticky="w", pady=(0, 12))
+        ctk.CTkLabel(container, textvariable=syntax_vars["fg"], width=90).grid(row=row, column=2, sticky="w", pady=(0, 12))
         row += 1
 
         ctk.CTkLabel(container, text="Tema do MSX BASIC").grid(row=row, column=0, sticky="w", pady=(0, 4))
@@ -511,8 +476,6 @@ class MSXViewer(ctk.CTkToplevel):
                 dialog,
                 appearance_var,
                 color_theme_var,
-                viewer_bg_var,
-                viewer_fg_var,
                 syntax_theme_var,
                 syntax_vars,
             ),
@@ -553,26 +516,20 @@ class MSXViewer(ctk.CTkToplevel):
         dialog: ctk.CTkToplevel,
         appearance_var: tk.StringVar,
         color_theme_var: tk.StringVar,
-        viewer_bg_var: tk.StringVar,
-        viewer_fg_var: tk.StringVar,
         syntax_theme_var: tk.StringVar,
         syntax_vars: dict[str, tk.StringVar],
     ) -> None:
         self.appearance_mode = appearance_var.get()
         self.color_theme = color_theme_var.get()
-        self.viewer_text_bg = viewer_bg_var.get().strip()
-        self.viewer_text_fg = viewer_fg_var.get().strip()
         self.syntax_theme_name = syntax_theme_var.get()
+        self.syntax_colors = {key: var.get() for key, var in syntax_vars.items()}
+        self.viewer_text_bg = self.syntax_colors.get("bg", "").strip()
+        self.viewer_text_fg = self.syntax_colors.get("fg", "").strip()
 
         self.db.set_setting("appearance_mode", self.appearance_mode)
         self.db.set_setting("color_theme", self.color_theme)
-        self.db.set_setting("viewer_text_bg", self.viewer_text_bg)
-        self.db.set_setting("viewer_text_fg", self.viewer_text_fg)
-        self.db.set_setting("syntax_theme", self.syntax_theme_name)
-        for key, var in syntax_vars.items():
-            self.db.set_setting(f"syntax_color_{key}", var.get())
-
-        self.syntax_colors = {key: var.get() for key, var in syntax_vars.items()}
+        
+        save_syntax_colors(self.db, self.syntax_theme_name, self.syntax_colors)
 
         ctk.set_appearance_mode(self.appearance_mode)
         ctk.set_default_color_theme(self.color_theme)
