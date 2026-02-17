@@ -10,6 +10,7 @@ import customtkinter as ctk
 
 from msx_basic_decoder import decode_msx_basic_segments
 from help_viewer import HelpViewer
+from msx_encoding_viewer import MSXEncodingViewer
 from syntax_themes import SYNTAX_THEMES, DEFAULT_SYNTAX_THEME, get_syntax_colors, save_syntax_colors
 
 # Paleta de cores do MSX1 (0-15)
@@ -277,6 +278,9 @@ class MSXBasicEditor(ctk.CTk):
 
         btn_help = ctk.CTkButton(toolbar, text="Ajuda", width=80, command=self._open_help_viewer)
         btn_help.grid(row=0, column=5, padx=2, pady=2)
+        
+        btn_encoding = ctk.CTkButton(toolbar, text="Encoding", width=80, command=self._open_encoding_viewer)
+        btn_encoding.grid(row=0, column=6, padx=2, pady=2)
 
 
         # Editor Area
@@ -1124,6 +1128,18 @@ class MSXBasicEditor(ctk.CTk):
         viewer = HelpViewer(self)
         viewer.focus()
 
+    def _open_encoding_viewer(self) -> None:
+        window = ctk.CTkToplevel(self)
+        window.title("Visualizador de Encodings MSX")
+        window.geometry("600x500")
+        
+        def insert_text(text: str):
+            self.textbox.insert(tk.INSERT, text)
+            self.textbox.focus_set()
+
+        viewer = MSXEncodingViewer(window, insert_callback=insert_text)
+        viewer.pack(fill="both", expand=True)
+        window.focus()
 
     def _show_msx1_palette(self, highlight_index: int | None = None) -> None:
         dialog = ctk.CTkToplevel(self)
